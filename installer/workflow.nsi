@@ -1,7 +1,9 @@
 !include "MUI2.nsh"
 
+!define PROJ_ROOT "${__FILEDIR__}\\.."
+
 Name "Workflow"
-OutFile "dist\\workflow-setup.exe"
+OutFile "${PROJ_ROOT}\\dist\\workflow-setup.exe"
 InstallDir "$PROGRAMFILES64\\Workflow"
 RequestExecutionLevel admin
 
@@ -13,9 +15,9 @@ RequestExecutionLevel admin
 
 Section "Install"
   SetOutPath "$INSTDIR"
-  File "dist\\workflow-web.exe"
-  File "dist\\workflow-worker.exe"
-  File "scripts\\start_all.bat"
+  File "${PROJ_ROOT}\\dist\\workflow-web.exe"
+  File "${PROJ_ROOT}\\dist\\workflow-worker.exe"
+  File "${PROJ_ROOT}\\scripts\\start_all.bat"
   WriteUninstaller "$INSTDIR\\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\\Workflow"
   CreateDirectory "$LOCALAPPDATA\\Workflow"
