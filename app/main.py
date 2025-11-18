@@ -3,6 +3,7 @@ import sys
 import time
 import threading
 from dataclasses import dataclass
+import json
 
 
 @dataclass
@@ -12,9 +13,21 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    path = os.path.join(os.getcwd(), "config", "settings.json")
+    data = None
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
     debug = os.environ.get("APP_DEBUG_SHORT_INTERVALS")
     if debug:
-        return Settings(capture_fps=1, analysis_interval_minutes=1)
+        return Settings(capture_fps=int(data.get("capture_fps", 1)) if data else 1,
+                        analysis_interval_minutes=1)
+    if data:
+        return Settings(capture_fps=int(data.get("capture_fps", 1)),
+                        analysis_interval_minutes=int(data.get("analysis_interval_minutes", 15)))
     return Settings()
 
 
