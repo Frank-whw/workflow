@@ -21,3 +21,4 @@ __pycache__/
 # Temporary
 tmp/
 temp/
+data/tmp_frames/
