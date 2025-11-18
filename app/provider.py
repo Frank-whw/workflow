@@ -21,7 +21,7 @@ class OpenAICompatibleProvider:
         content.append({"type": "text", "text": prompt})
         if collage_b64:
             content.append({
-                "type": "input_image",
+                "type": "image_url",
                 "image_url": {"url": "data:image/jpeg;base64," + collage_b64}
             })
         sys_text = system_prompt.strip() if system_prompt else "你是时间线助手。任务：依据最近的窗口标题与代表拼贴图，简洁总结过去一段时间的主要活动（不超过60字），并指出2-3个可能的分心来源（应用或网站）。以中文输出。"
@@ -30,16 +30,53 @@ class OpenAICompatibleProvider:
             "messages": [
                 {"role": "system", "content": [{"type": "text", "text": sys_text}]},
                 {"role": "user", "content": content}
-            ]
+            ],
+            "max_tokens": 512,
+            "temperature": 0.6
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}" if self.api_key else "",
             "Content-Type": "application/json"
         }
         url = self.base_url + "/chat/completions"
-        r = requests.post(url, json=payload, headers=headers, timeout=30)
-        r.raise_for_status()
-        data = r.json()
+        # 尝试主样式
+        try:
+            r = requests.post(url, json=payload, headers=headers, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+        except Exception:
+            # 回退：仅文本
+            payload_fallback = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": [{"type": "text", "text": sys_text}]},
+                    {"role": "user", "content": [{"type": "text", "text": prompt}]}
+                ],
+                "max_tokens": 512,
+                "temperature": 0.6
+            }
+            try:
+                r = requests.post(url, json=payload_fallback, headers=headers, timeout=30)
+                r.raise_for_status()
+                data = r.json()
+            except Exception:
+                # 回退2：某些实现使用 images 字段
+                if collage_b64:
+                    payload_images = {
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": sys_text},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "images": [{"mime_type": "image/jpeg", "data": collage_b64}],
+                        "max_tokens": 512,
+                        "temperature": 0.6
+                    }
+                    r = requests.post(url, json=payload_images, headers=headers, timeout=30)
+                    r.raise_for_status()
+                    data = r.json()
+                else:
+                    data = {"choices": [{"message": {"content": ""}}]}
         msg = (data.get("choices") or [{}])[0].get("message", {})
         txt = ""
         if isinstance(msg.get("content"), list):
