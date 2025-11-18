@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 from app.capture import ScreenCapture
 from app.activity import ActivityTracker
+from app.sampler import list_recent_frames, sample_even, make_collage
 
 
 @dataclass
@@ -68,7 +69,12 @@ class Scheduler:
         while not self._stop.is_set():
             time.sleep(interval)
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[analysis] run {ts}")
+            frames = list_recent_frames(os.path.join(os.getcwd(), "data", "tmp_frames"), 120)
+            picked = sample_even(frames, 12)
+            collage_dir = os.path.join(os.getcwd(), "data", "tmp_collages")
+            collage_path = os.path.join(collage_dir, f"collage_{int(time.time())}.jpg")
+            out = make_collage(picked, (3, 4), collage_path)
+            print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)}")
 
 
 def main():
