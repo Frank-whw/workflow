@@ -27,7 +27,7 @@ class OpenAICompatibleProvider:
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": [{"type": "text", "text": "你是一个时间线助手，请用一句话总结过去时间段的活动，并给出可能的分心来源。"}]},
+                {"role": "system", "content": [{"type": "text", "text": "你是时间线助手。任务：依据最近的窗口标题与代表拼贴图，简洁总结过去一段时间的主要活动（不超过60字），并指出2-3个可能的分心来源（应用或网站）。以中文输出。"}]},
                 {"role": "user", "content": content}
             ]
         }
