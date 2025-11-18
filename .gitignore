@@ -1,0 +1,23 @@
+.trae/
+node_modules/
+dist/
+build/
+out/
+.DS_Store
+Thumbs.db
+*.log
+
+# .NET/VS
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc
+
+# Temporary
+tmp/
+temp/
