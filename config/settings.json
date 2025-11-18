@@ -1,11 +1,11 @@
 {
   "capture_fps": 1,
-  "analysis_interval_minutes": 15,
+  "analysis_interval_minutes": 5,
   "model_provider": {
-    "type": "none",
-    "base_url": "",
+    "type": "openai_compatible",
+    "base_url": "https://chat.ecnu.edu.cn/open/api/v1",
     "api_key": "",
-    "model": ""
+    "model": "ecnu-vl"
   },
   "analysis": {
     "use_image": true,
