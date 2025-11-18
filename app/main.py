@@ -56,8 +56,14 @@ def main():
     scheduler = Scheduler(settings)
     scheduler.start()
     try:
-        while True:
-            time.sleep(0.5)
+        run_seconds = os.environ.get("RUN_SECONDS")
+        if run_seconds:
+            end = time.time() + max(1, int(run_seconds))
+            while time.time() < end:
+                time.sleep(0.5)
+        else:
+            while True:
+                time.sleep(0.5)
     except KeyboardInterrupt:
         scheduler.stop()
         print("stopped")
