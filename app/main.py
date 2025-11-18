@@ -142,7 +142,15 @@ class Scheduler:
                     api_key=self.settings.model_api_key,
                     model=self.settings.model_name or "gpt-4o-mini"
                 )
-                card = prov.summarize(card_info, collage_b64 if self.settings.analysis_use_image else "")
+                sys_prompt = ""
+                ppath = os.path.join(os.getcwd(), "prompt.txt")
+                if os.path.exists(ppath):
+                    try:
+                        with open(ppath, "r", encoding="utf-8") as pf:
+                            sys_prompt = pf.read()
+                    except Exception:
+                        sys_prompt = ""
+                card = prov.summarize(card_info, collage_b64 if self.settings.analysis_use_image else "", sys_prompt)
                 provider_used = "openai_compatible"
                 model_used = prov.model
             except Exception:

@@ -8,7 +8,7 @@ class OpenAICompatibleProvider:
         self.api_key = api_key
         self.model = model
 
-    def summarize(self, info: dict, collage_b64: str = "") -> dict:
+    def summarize(self, info: dict, collage_b64: str = "", system_prompt: str = "") -> dict:
         content = []
         text_parts = []
         titles = info.get("window_titles") or []
@@ -24,10 +24,11 @@ class OpenAICompatibleProvider:
                 "type": "input_image",
                 "image_url": {"url": "data:image/jpeg;base64," + collage_b64}
             })
+        sys_text = system_prompt.strip() if system_prompt else "你是时间线助手。任务：依据最近的窗口标题与代表拼贴图，简洁总结过去一段时间的主要活动（不超过60字），并指出2-3个可能的分心来源（应用或网站）。以中文输出。"
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": [{"type": "text", "text": "你是时间线助手。任务：依据最近的窗口标题与代表拼贴图，简洁总结过去一段时间的主要活动（不超过60字），并指出2-3个可能的分心来源（应用或网站）。以中文输出。"}]},
+                {"role": "system", "content": [{"type": "text", "text": sys_text}]},
                 {"role": "user", "content": content}
             ]
         }
@@ -46,9 +47,19 @@ class OpenAICompatibleProvider:
             txt = " ".join([t for t in parts if t])
         else:
             txt = msg.get("content") or ""
-        return {
-            "title": "最近活动摘要",
-            "summary": txt or "无模型返回",
-            "apps": [],
-            "domains": []
-        }
+        # 尝试解析为 JSON 数组（若提示要求返回结构化结果）
+        import json as _json
+        parsed = None
+        try:
+            s = txt.strip()
+            if s.startswith("```"):
+                s = s.strip("`\n ")
+            parsed = _json.loads(s)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, list) and parsed:
+            first = parsed[0]
+            title = first.get("title") or "最近活动摘要"
+            summary = first.get("summary") or txt or "无模型返回"
+            return {"title": title, "summary": summary, "apps": [], "domains": [], "timeline": parsed}
+        return {"title": "最近活动摘要", "summary": txt or "无模型返回", "apps": [], "domains": []}
