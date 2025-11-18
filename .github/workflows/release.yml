@@ -1,0 +1,37 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Build web exe
+        run: pyinstaller --noconfirm --clean --onefile --name workflow-web --add-data "app\\templates;app\\templates" --add-data "app\\static;app\\static" app\\web.py
+      - name: Build worker exe
+        run: pyinstaller --noconfirm --clean --onefile --name workflow-worker app\\main.py
+      - name: Install NSIS
+        run: choco install nsis -y
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (!(Test-Path $nsis)) { $nsis = "${env:ProgramFiles}\NSIS\makensis.exe" }
+          & $nsis installer\workflow.nsi
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist\\workflow-setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
