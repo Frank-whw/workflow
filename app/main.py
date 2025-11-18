@@ -99,6 +99,9 @@ def main():
     scheduler.start()
     try:
         run_seconds = os.environ.get("RUN_SECONDS")
+        if os.environ.get("RUN_ANALYSIS_ON_START"):
+            time.sleep(0.5)
+            scheduler._analysis_loop()
         if run_seconds:
             end = time.time() + max(1, int(run_seconds))
             while time.time() < end:
