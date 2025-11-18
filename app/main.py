@@ -4,6 +4,8 @@ import time
 import threading
 from dataclasses import dataclass
 import json
+from app.capture import ScreenCapture
+from app.activity import ActivityTracker
 
 
 @dataclass
@@ -36,6 +38,8 @@ class Scheduler:
         self.settings = settings
         self._stop = threading.Event()
         self._threads = []
+        self._cap = ScreenCapture(out_dir=os.path.join(os.getcwd(), "data", "tmp_frames"))
+        self._tracker = ActivityTracker()
 
     def start(self):
         t1 = threading.Thread(target=self._capture_loop, daemon=True)
@@ -53,7 +57,10 @@ class Scheduler:
         interval = 1.0 / max(1, self.settings.capture_fps)
         while not self._stop.is_set():
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[capture] tick {ts}")
+            path = self._cap.capture_to_file()
+            title, pid = self._tracker.get_foreground_activity()
+            info = f"title={title or ''} pid={pid or ''}"
+            print(f"[capture] {ts} saved={bool(path)} {info}")
             time.sleep(interval)
 
     def _analysis_loop(self):
