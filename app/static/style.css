@@ -1,0 +1,48 @@
+:root { --bg: #fafbfc; --panel: #ffffff; --text: #1f2937; --muted: #6b7280; --border: #e5e7eb; --accent: #2563eb; --warn: #ef4444; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0b0f14; --panel: #0f141a; --text: #e5e7eb; --muted: #9ca3af; --border: #1f2937; --accent: #60a5fa; --warn: #f87171; } }
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+.container { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+.site-header { position: sticky; top: 0; z-index: 10; background: var(--panel); border-bottom: 1px solid var(--border); backdrop-filter: saturate(180%) blur(8px); }
+.site-header .brand { font-weight: 700; font-size: 18px; padding: 12px 0; }
+.site-header .search { display: flex; gap: 8px; align-items: center; }
+.site-header .container { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; }
+.site-header input { border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 8px 10px; border-radius: 8px; min-width: 280px; }
+.site-header button { border: 1px solid var(--accent); background: var(--accent); color: #fff; padding: 8px 12px; border-radius: 8px; }
+.grid { list-style: none; padding: 24px 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.card { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: var(--panel); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.card-title { margin: 0 0 6px 0; font-size: 18px; line-height: 1.25; }
+.card-summary { margin: 0 0 10px 0; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); background: transparent; font-size: 12px; }
+.chip.alt { border-color: transparent; background: rgba(37,99,235,.08); color: var(--accent); }
+.chip.warn { border-color: transparent; background: rgba(239,68,68,.12); color: var(--warn); }
+.hero { padding: 24px 0; }
+.title-xxl { margin: 0 0 8px; font-size: 28px; line-height: 1.2; }
+.lead { margin: 8px 0 12px; color: var(--muted); font-size: 16px; }
+.collage { margin: 14px 0 0; }
+.collage img { max-width: 100%; border: 1px solid var(--border); border-radius: 12px; display: block; }
+.section-title { margin: 12px 0; font-size: 16px; color: var(--muted); }
+.timeline { padding: 8px 0 24px; }
+.tl-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
+.tl-item { position: relative; display: grid; grid-template-columns: 20px 1fr; gap: 12px; }
+.tl-line { grid-column: 1; border-left: 2px solid var(--border); margin-left: 9px; position: relative; }
+.tl-line::before { content: ""; position: absolute; left: -6px; top: 0; width: 12px; height: 12px; border-radius: 999px; background: var(--accent); }
+.tl-content { grid-column: 2; border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.tl-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tl-time { font-weight: 600; font-size: 13px; }
+.tl-title { margin: 6px 0; font-size: 18px; }
+.tl-summary { margin: 0; color: var(--muted); }
+.tl-detail { margin: 6px 0 0; color: var(--text); }
+.apps { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+.form { display: grid; gap: 16px; padding: 16px 0; }
+.form fieldset { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel); }
+.form legend { padding: 0 6px; color: var(--muted); }
+.field { display: grid; gap: 6px; margin-bottom: 10px; }
+.field label { font-size: 13px; color: var(--text); }
+.field input, .field select { border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 8px 10px; border-radius: 8px; }
+.actions { display: flex; align-items: center; gap: 10px; }
+.status { color: var(--muted); }
+.hint { color: var(--muted); font-size: 12px; }

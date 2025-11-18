@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <div class="brand"><a href="/">Timeline</a></div>
+    </div>
+  </header>
+  <main class="container">
+    <h1 class="title-xxl">Settings</h1>
+    <form id="form" class="form">
+      <fieldset>
+        <legend>Capture & Analysis</legend>
+        <div class="field">
+          <label>Capture FPS</label>
+          <input type="number" name="capture_fps" min="1" />
+        </div>
+        <div class="field">
+          <label>Analysis Interval (minutes)</label>
+          <input type="number" name="analysis_interval_minutes" min="1" />
+        </div>
+        <div class="field">
+          <label><input type="checkbox" name="analysis.use_image" /> Use Image</label>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" name="analysis.use_ocr" /> Use OCR</label>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" name="analysis.log_capture" /> Log Capture</label>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" name="analysis.persist_raw_response" /> Persist Raw Response</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Model Provider</legend>
+        <div class="field">
+          <label>Type</label>
+          <select name="model_provider.type">
+            <option value="none">none</option>
+            <option value="openai_compatible">openai_compatible</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Base URL</label>
+          <input type="text" name="model_provider.base_url" />
+        </div>
+        <div class="field">
+          <label>Model Name</label>
+          <input type="text" name="model_provider.model" />
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input type="password" name="model_provider.api_key" placeholder="Enter to update; left blank to keep" />
+          <small id="api_key_hint" class="hint"></small>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Cleanup</legend>
+        <div class="field"><label>Tmp Frames Minutes</label><input type="number" name="cleanup.tmp_frames_minutes" min="1" /></div>
+        <div class="field"><label>Collages Days</label><input type="number" name="cleanup.collages_days" min="0" /></div>
+        <div class="field"><label>Cards Days</label><input type="number" name="cleanup.cards_days" min="0" /></div>
+        <div class="field"><label>Max Data Size (MB)</label><input type="number" name="cleanup.max_data_size_mb" min="1" /></div>
+      </fieldset>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <span id="status" class="status"></span>
+      </div>
+    </form>
+  </main>
+  <script>
+    const f = document.getElementById('form');
+    const status = document.getElementById('status');
+    const apiKeyHint = document.getElementById('api_key_hint');
+    function set(name, value) { const el = f.querySelector(`[name="${name}"]`); if (!el) return; if (el.type==='checkbox') el.checked = !!value; else el.value = value ?? ''; }
+    function get(name) { const el = f.querySelector(`[name="${name}"]`); if (!el) return undefined; if (el.type==='checkbox') return el.checked; return el.value; }
+    function load() {
+      fetch('/api/settings').then(r=>r.json()).then(s=>{
+        set('capture_fps', s.capture_fps);
+        set('analysis_interval_minutes', s.analysis_interval_minutes);
+        set('analysis.use_image', s.analysis?.use_image);
+        set('analysis.use_ocr', s.analysis?.use_ocr);
+        set('analysis.log_capture', s.analysis?.log_capture);
+        set('analysis.persist_raw_response', s.analysis?.persist_raw_response);
+        set('model_provider.type', s.model_provider?.type);
+        set('model_provider.base_url', s.model_provider?.base_url);
+        set('model_provider.model', s.model_provider?.model);
+        apiKeyHint.textContent = s.model_provider?.api_key_set ? 'API key configured' : 'API key not set';
+        set('cleanup.tmp_frames_minutes', s.cleanup?.tmp_frames_minutes);
+        set('cleanup.collages_days', s.cleanup?.collages_days);
+        set('cleanup.cards_days', s.cleanup?.cards_days);
+        set('cleanup.max_data_size_mb', s.cleanup?.max_data_size_mb);
+      });
+    }
+    f.addEventListener('submit', e=>{
+      e.preventDefault();
+      status.textContent = 'Saving...';
+      const payload = {
+        capture_fps: Number(get('capture_fps')),
+        analysis_interval_minutes: Number(get('analysis_interval_minutes')),
+        model_provider: {
+          type: get('model_provider.type'),
+          base_url: get('model_provider.base_url'),
+          model: get('model_provider.model'),
+          api_key: get('model_provider.api_key'),
+        },
+        analysis: {
+          use_image: get('analysis.use_image'),
+          use_ocr: get('analysis.use_ocr'),
+          log_capture: get('analysis.log_capture'),
+          persist_raw_response: get('analysis.persist_raw_response'),
+        },
+        cleanup: {
+          tmp_frames_minutes: Number(get('cleanup.tmp_frames_minutes')),
+          collages_days: Number(get('cleanup.collages_days')),
+          cards_days: Number(get('cleanup.cards_days')),
+          max_data_size_mb: Number(get('cleanup.max_data_size_mb')),
+        }
+      };
+      if (!payload.model_provider.api_key) delete payload.model_provider.api_key;
+      fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r=>r.ok?r.json():Promise.reject())
+        .then(()=>{ status.textContent = 'Saved'; load(); setTimeout(()=>status.textContent='', 1500); })
+        .catch(()=>{ status.textContent = 'Failed'; });
+    });
+    load();
+  </script>
+  </body>
+  </html>

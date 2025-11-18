@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analysis {{ ts }}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <div class="brand"><a href="/">Timeline</a></div>
+    </div>
+  </header>
+  <main class="container">
+    <section class="hero">
+      <h1 class="title-xxl">{{ obj.title }}</h1>
+      <p class="lead">{{ obj.summary }}</p>
+      <div class="chips">
+        <span class="chip">{{ obj.time }}</span>
+        <span class="chip">{{ obj.provider }} / {{ obj.model }}</span>
+        <span class="chip alt">{{ obj.source }}</span>
+        {% if obj.provider_fallback and obj.provider_fallback != 'none' %}
+        <span class="chip warn">fallback: {{ obj.provider_fallback }}</span>
+        {% endif %}
+      </div>
+      {% if collage_name %}
+      <div class="collage">
+        <img src="/collages/{{ collage_name }}" alt="collage" />
+      </div>
+      {% endif %}
+    </section>
+    <section class="timeline">
+      <h2 class="section-title">Timeline</h2>
+      <ul class="tl-list">
+        {% for c in timeline %}
+        <li class="tl-item">
+          <div class="tl-line"></div>
+          <div class="tl-content">
+            <div class="tl-head">
+              <div class="tl-time">{{ c.startTime }} – {{ c.endTime }}</div>
+              <div class="chips">
+                <span class="chip">{{ c.category }}</span>
+                <span class="chip alt">{{ c.subcategory }}</span>
+              </div>
+            </div>
+            <h3 class="tl-title">{{ c.title }}</h3>
+            <p class="tl-summary">{{ c.summary }}</p>
+            {% if c.detailedSummary %}<p class="tl-detail">{{ c.detailedSummary }}</p>{% endif %}
+            {% if c.appSites %}
+            <div class="apps">primary: {{ c.appSites.primary }} {% if c.appSites.secondary %} | secondary: {{ c.appSites.secondary }}{% endif %}</div>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    <section>
+      <details>
+        <summary>Raw response</summary>
+        <pre id="raw"></pre>
+      </details>
+    </section>
+  </main>
+  <script>
+    fetch('/api/raw/{{ ts }}').then(r=>r.ok?r.json():Promise.reject()).then(j=>{
+      document.getElementById('raw').textContent = JSON.stringify(j, null, 2);
+    }).catch(()=>{});
+  </script>
+  </body>
+  </html>

@@ -116,7 +116,7 @@ def load_settings() -> Settings:
         base.cleanup_collages_days = int(cl.get("collages_days", base.cleanup_collages_days))
         base.cleanup_cards_days = int(cl.get("cards_days", base.cleanup_cards_days))
         base.cleanup_max_data_size_mb = int(cl.get("max_data_size_mb", base.cleanup_max_data_size_mb))
-    if debug:
+    if str(debug).lower() in {"1", "true", "yes"}:
         base.analysis_interval_minutes = 1
     env_base = os.environ.get("MODEL_BASE_URL")
     env_key = os.environ.get("MODEL_API_KEY")
@@ -125,6 +125,12 @@ def load_settings() -> Settings:
         base.model_type = "openai_compatible"
     if env_key:
         base.model_api_key = env_key
+    base.capture_fps = max(1, min(30, base.capture_fps))
+    base.analysis_interval_minutes = max(1, min(1440, base.analysis_interval_minutes))
+    base.cleanup_tmp_frames_minutes = max(1, min(1440, base.cleanup_tmp_frames_minutes))
+    base.cleanup_collages_days = max(0, min(365, base.cleanup_collages_days))
+    base.cleanup_cards_days = max(0, min(365, base.cleanup_cards_days))
+    base.cleanup_max_data_size_mb = max(50, min(10000, base.cleanup_max_data_size_mb))
     return base
 
 
@@ -250,28 +256,37 @@ class Scheduler:
             "provider_fallback": provider_fallback,
             "source": card.get("source") or ("model" if provider_used != "local" else "heuristic")
         }
-        with open(primary_path, "w", encoding="utf-8") as f:
-            f.write(_json.dumps(obj, ensure_ascii=False))
+        try:
+            with open(primary_path, "w", encoding="utf-8") as f:
+                f.write(_json.dumps(obj, ensure_ascii=False))
+        except Exception:
+            pass
         split_paths = []
         if timeline and len(timeline) > 1:
             for i, it in enumerate(timeline):
                 p = os.path.join(cards_dir, f"analysis_{base_ts}_{i}.json")
-                with open(p, "w", encoding="utf-8") as f:
-                    f.write(_json.dumps({
-                        "time": ts,
-                        "card": it,
-                        "collage": out,
-                        "provider": provider_used,
-                        "model": model_used,
-                        "source": obj["source"],
-                    }, ensure_ascii=False))
+                try:
+                    with open(p, "w", encoding="utf-8") as f:
+                        f.write(_json.dumps({
+                            "time": ts,
+                            "card": it,
+                            "collage": out,
+                            "provider": provider_used,
+                            "model": model_used,
+                            "source": obj["source"],
+                        }, ensure_ascii=False))
+                except Exception:
+                    pass
                 split_paths.append(p)
             index_path = os.path.join(cards_dir, f"analysis_{base_ts}_index.json")
-            with open(index_path, "w", encoding="utf-8") as f:
-                f.write(_json.dumps({
-                    "primary": primary_path,
-                    "parts": split_paths
-                }, ensure_ascii=False))
+            try:
+                with open(index_path, "w", encoding="utf-8") as f:
+                    f.write(_json.dumps({
+                        "primary": primary_path,
+                        "parts": split_paths
+                    }, ensure_ascii=False))
+            except Exception:
+                pass
         raw = card.get("raw_response")
         persist_raw = False
         try:
@@ -279,9 +294,14 @@ class Scheduler:
         except Exception:
             persist_raw = False
         if persist_raw and raw is not None:
-            raw_path = os.path.join(cards_dir, f"raw_{base_ts}.json")
-            with open(raw_path, "w", encoding="utf-8") as f:
-                f.write(_json.dumps(raw, ensure_ascii=False))
+            try:
+                s = _json.dumps(raw, ensure_ascii=False)
+                if len(s) <= 1000000:
+                    raw_path = os.path.join(cards_dir, f"raw_{base_ts}.json")
+                    with open(raw_path, "w", encoding="utf-8") as f:
+                        f.write(s)
+            except Exception:
+                pass
         print(f"[analysis] {ts} provider={provider_used} model={model_used} title={title} saved={os.path.basename(primary_path)}")
 
     def _cleanup_loop(self):

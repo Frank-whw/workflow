@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analyses</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <div class="brand"><a href="/">Timeline</a></div>
+      <form class="search" method="get" action="/">
+        <input type="text" name="query" placeholder="Search title or summary" value="{{ request.args.get('query') or '' }}" />
+        <button type="submit">Search</button>
+      </form>
+      <div><a href="/settings">Settings</a></div>
+    </div>
+  </header>
+  <main class="container">
+    <ul class="grid">
+      {% for it in items %}
+      <li class="card">
+        <a class="card-link" href="/analysis/{{ it.ts }}">
+          <h2 class="card-title">{{ it.title }}</h2>
+        </a>
+        <p class="card-summary">{{ it.summary }}</p>
+        <div class="chips">
+          <span class="chip">{{ it.time }}</span>
+          <span class="chip">{{ it.provider }} / {{ it.model }}</span>
+          <span class="chip alt">{{ it.source }}</span>
+          {% if it.provider_fallback and it.provider_fallback != 'none' %}
+          <span class="chip warn">fallback: {{ it.provider_fallback }}</span>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </main>
+  <script src="/static/main.js"></script>
+  </body>
+  </html>
