@@ -10,12 +10,24 @@ from app.sampler import list_recent_frames, sample_even, make_collage
 from app.ocr import extract_text
 from app.model import summarize_card
 import json as _json
+from collections import deque
+import base64
 
 
 @dataclass
 class Settings:
     capture_fps: int = 1
     analysis_interval_minutes: int = 15
+    model_type: str = "none"
+    model_base_url: str = ""
+    model_api_key: str = ""
+    model_name: str = ""
+    analysis_use_image: bool = True
+    analysis_use_ocr: bool = False
+    cleanup_tmp_frames_minutes: int = 25
+    cleanup_collages_days: int = 3
+    cleanup_cards_days: int = 30
+    cleanup_max_data_size_mb: int = 500
 
 
 def load_settings() -> Settings:
@@ -28,13 +40,33 @@ def load_settings() -> Settings:
         except Exception:
             data = None
     debug = os.environ.get("APP_DEBUG_SHORT_INTERVALS")
-    if debug:
-        return Settings(capture_fps=int(data.get("capture_fps", 1)) if data else 1,
-                        analysis_interval_minutes=1)
+    base = Settings()
     if data:
-        return Settings(capture_fps=int(data.get("capture_fps", 1)),
-                        analysis_interval_minutes=int(data.get("analysis_interval_minutes", 15)))
-    return Settings()
+        base.capture_fps = int(data.get("capture_fps", base.capture_fps))
+        base.analysis_interval_minutes = int(data.get("analysis_interval_minutes", base.analysis_interval_minutes))
+        mp = data.get("model_provider", {})
+        base.model_type = str(mp.get("type", base.model_type))
+        base.model_base_url = str(mp.get("base_url", base.model_base_url))
+        base.model_api_key = str(mp.get("api_key", base.model_api_key))
+        base.model_name = str(mp.get("model", base.model_name))
+        an = data.get("analysis", {})
+        base.analysis_use_image = bool(an.get("use_image", base.analysis_use_image))
+        base.analysis_use_ocr = bool(an.get("use_ocr", base.analysis_use_ocr))
+        cl = data.get("cleanup", {})
+        base.cleanup_tmp_frames_minutes = int(cl.get("tmp_frames_minutes", base.cleanup_tmp_frames_minutes))
+        base.cleanup_collages_days = int(cl.get("collages_days", base.cleanup_collages_days))
+        base.cleanup_cards_days = int(cl.get("cards_days", base.cleanup_cards_days))
+        base.cleanup_max_data_size_mb = int(cl.get("max_data_size_mb", base.cleanup_max_data_size_mb))
+    if debug:
+        base.analysis_interval_minutes = 1
+    env_base = os.environ.get("MODEL_BASE_URL")
+    env_key = os.environ.get("MODEL_API_KEY")
+    if env_base:
+        base.model_base_url = env_base
+        base.model_type = "openai_compatible"
+    if env_key:
+        base.model_api_key = env_key
+    return base
 
 
 class Scheduler:
@@ -44,6 +76,7 @@ class Scheduler:
         self._threads = []
         self._cap = ScreenCapture(out_dir=os.path.join(os.getcwd(), "data", "tmp_frames"))
         self._tracker = ActivityTracker()
+        self._title_buffer = deque(maxlen=max(120, self.settings.analysis_interval_minutes * 60))
 
     def start(self):
         t1 = threading.Thread(target=self._capture_loop, daemon=True)
@@ -65,6 +98,8 @@ class Scheduler:
             title, pid = self._tracker.get_foreground_activity()
             info = f"title={title or ''} pid={pid or ''}"
             print(f"[capture] {ts} saved={bool(path)} {info}")
+            if title:
+                self._title_buffer.append((time.time(), title))
             time.sleep(interval)
 
     def _analysis_loop(self):
@@ -77,20 +112,41 @@ class Scheduler:
             collage_dir = os.path.join(os.getcwd(), "data", "tmp_collages")
             collage_path = os.path.join(collage_dir, f"collage_{int(time.time())}.jpg")
             out = make_collage(picked, (3, 4), collage_path)
-            text = extract_text(picked)
+            text = extract_text(picked) if self.settings.analysis_use_ocr else ""
             card_info = {
-                "window_titles": [self._tracker.get_foreground_activity()[0]] if picked else [],
+                "window_titles": [t for ts2, t in self._title_buffer if time.time() - ts2 <= self.settings.analysis_interval_minutes * 60][-10:],
                 "ocr_text": text,
                 "apps": [],
                 "domains": [],
             }
-            card = summarize_card(card_info)
+            card = None
+            provider_used = "local"
+            model_used = ""
+            collage_b64 = ""
+            if self.settings.analysis_use_image and out and os.path.exists(out):
+                with open(out, "rb") as f:
+                    collage_b64 = base64.b64encode(f.read()).decode("ascii")
+            if self.settings.model_type == "openai_compatible" and self.settings.model_base_url:
+                try:
+                    from app.provider import OpenAICompatibleProvider
+                    prov = OpenAICompatibleProvider(
+                        base_url=self.settings.model_base_url,
+                        api_key=self.settings.model_api_key,
+                        model=self.settings.model_name or "gpt-4o-mini"
+                    )
+                    card = prov.summarize(card_info, collage_b64 if self.settings.analysis_use_image else "")
+                    provider_used = "openai_compatible"
+                    model_used = prov.model
+                except Exception:
+                    card = None
+            if not card:
+                card = summarize_card(card_info)
             cards_dir = os.path.join(os.getcwd(), "data", "cards")
             os.makedirs(cards_dir, exist_ok=True)
             card_path = os.path.join(cards_dir, f"card_{int(time.time())}.json")
             with open(card_path, "w", encoding="utf-8") as f:
-                f.write(_json.dumps({"time": ts, "card": card, "collage": out}, ensure_ascii=False))
-            print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)} card_saved=True")
+                f.write(_json.dumps({"time": ts, "card": card, "collage": out, "provider": provider_used, "model": model_used}, ensure_ascii=False))
+            print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)} card_saved=True provider={provider_used}")
 
 
 def main():

@@ -1,4 +1,20 @@
 {
   "capture_fps": 1,
-  "analysis_interval_minutes": 15
+  "analysis_interval_minutes": 15,
+  "model_provider": {
+    "type": "none",
+    "base_url": "",
+    "api_key": "",
+    "model": ""
+  },
+  "analysis": {
+    "use_image": true,
+    "use_ocr": false
+  },
+  "cleanup": {
+    "tmp_frames_minutes": 25,
+    "collages_days": 3,
+    "cards_days": 30,
+    "max_data_size_mb": 500
+  }
 }
