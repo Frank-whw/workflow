@@ -39,5 +39,5 @@ def make_collage(paths: List[str], grid: Tuple[int, int], out_path: str, canvas_
         except Exception:
             continue
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    canvas.save(out_path, format='JPEG', quality=80)
+    canvas.save(out_path, format='JPEG', quality=70)
     return out_path

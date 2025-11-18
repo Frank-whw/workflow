@@ -12,6 +12,7 @@ from app.model import summarize_card
 import json as _json
 from collections import deque
 import base64
+from app.cleanup import CleanupService
 
 
 @dataclass
@@ -81,7 +82,8 @@ class Scheduler:
     def start(self):
         t1 = threading.Thread(target=self._capture_loop, daemon=True)
         t2 = threading.Thread(target=self._analysis_loop, daemon=True)
-        self._threads.extend([t1, t2])
+        t3 = threading.Thread(target=self._cleanup_loop, daemon=True)
+        self._threads.extend([t1, t2, t3])
         for t in self._threads:
             t.start()
 
@@ -147,6 +149,18 @@ class Scheduler:
             with open(card_path, "w", encoding="utf-8") as f:
                 f.write(_json.dumps({"time": ts, "card": card, "collage": out, "provider": provider_used, "model": model_used}, ensure_ascii=False))
             print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)} card_saved=True provider={provider_used}")
+
+    def _cleanup_loop(self):
+        base_dir = os.path.join(os.getcwd(), "data")
+        svc = CleanupService(
+            base_dir=base_dir,
+            tmp_minutes=self.settings.cleanup_tmp_frames_minutes,
+            collages_days=self.settings.cleanup_collages_days,
+            cards_days=self.settings.cleanup_cards_days,
+            max_mb=self.settings.cleanup_max_data_size_mb,
+        )
+        while not self._stop.is_set():
+            svc.run()
 
 
 def main():
