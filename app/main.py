@@ -7,6 +7,9 @@ import json
 from app.capture import ScreenCapture
 from app.activity import ActivityTracker
 from app.sampler import list_recent_frames, sample_even, make_collage
+from app.ocr import extract_text
+from app.model import summarize_card
+import json as _json
 
 
 @dataclass
@@ -74,7 +77,20 @@ class Scheduler:
             collage_dir = os.path.join(os.getcwd(), "data", "tmp_collages")
             collage_path = os.path.join(collage_dir, f"collage_{int(time.time())}.jpg")
             out = make_collage(picked, (3, 4), collage_path)
-            print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)}")
+            text = extract_text(picked)
+            card_info = {
+                "window_titles": [self._tracker.get_foreground_activity()[0]] if picked else [],
+                "ocr_text": text,
+                "apps": [],
+                "domains": [],
+            }
+            card = summarize_card(card_info)
+            cards_dir = os.path.join(os.getcwd(), "data", "cards")
+            os.makedirs(cards_dir, exist_ok=True)
+            card_path = os.path.join(cards_dir, f"card_{int(time.time())}.json")
+            with open(card_path, "w", encoding="utf-8") as f:
+                f.write(_json.dumps({"time": ts, "card": card, "collage": out}, ensure_ascii=False))
+            print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)} card_saved=True")
 
 
 def main():
