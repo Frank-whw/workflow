@@ -24,13 +24,14 @@ class OpenAICompatibleProvider:
                 "type": "image_url",
                 "image_url": {"url": "data:image/jpeg;base64," + collage_b64}
             })
-        sys_text = system_prompt.strip() if system_prompt else "你是时间线助手。任务：依据最近的窗口标题与代表拼贴图，简洁总结过去一段时间的主要活动（不超过60字），并指出2-3个可能的分心来源（应用或网站）。以中文输出。"
+        sys_text = system_prompt.strip() if system_prompt else "你是时间线助手。任务：依据窗口标题与代表拼贴图，输出一段中文摘要（60字内），并列出2-3个可能的分心来源（应用或网站）。"
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": [{"type": "text", "text": sys_text}]},
+                {"role": "system", "content": sys_text},
                 {"role": "user", "content": content}
             ],
+            "stream": False,
             "max_tokens": 512,
             "temperature": 0.6
         }
@@ -49,9 +50,10 @@ class OpenAICompatibleProvider:
             payload_fallback = {
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": [{"type": "text", "text": sys_text}]},
+                    {"role": "system", "content": sys_text},
                     {"role": "user", "content": [{"type": "text", "text": prompt}]}
                 ],
+                "stream": False,
                 "max_tokens": 512,
                 "temperature": 0.6
             }
