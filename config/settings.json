@@ -10,7 +10,8 @@
   "analysis": {
     "use_image": true,
     "use_ocr": false,
-    "log_capture": false
+    "log_capture": false,
+    "persist_raw_response": false
   },
   "cleanup": {
     "tmp_frames_minutes": 25,

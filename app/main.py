@@ -14,6 +14,60 @@ from collections import deque
 import base64
 from app.cleanup import CleanupService
 
+def _normalize_title(title: str) -> str:
+    t = (title or "").strip()
+    parts = [p for p in t.split() if p]
+    parts = parts[:10]
+    return " ".join(parts) or "Recent Activity"
+
+def _normalize_summary(summary: str) -> str:
+    s = (summary or "").strip()
+    if not s:
+        return "No model output"
+    seps = ".!?"
+    out = []
+    buf = ""
+    for ch in s:
+        buf += ch
+        if ch in seps:
+            out.append(buf.strip())
+            buf = ""
+            if len(out) >= 2:
+                break
+    if len(out) < 2 and buf.strip():
+        out.append(buf.strip())
+    return " ".join(out)
+
+def _to_12h(t: str) -> str:
+    s = (t or "").strip()
+    if not s:
+        return s
+    if "AM" in s or "PM" in s:
+        return s
+    try:
+        hh, mm = s.split(":")[:2]
+        h = int(hh)
+        m = int(mm)
+        ap = "AM" if h < 12 else "PM"
+        h12 = h % 12
+        if h12 == 0:
+            h12 = 12
+        return f"{h12}:{m:02d} {ap}"
+    except Exception:
+        return s
+
+def _infer_category(titles: list) -> tuple:
+    joined = " ".join(titles or []).lower()
+    if any(k in joined for k in ["visual studio", "cursor", "code", "github", "gitlab", "terminal"]):
+        return "Work", "Coding"
+    if any(k in joined for k in ["figma", "sketch", "photoshop"]):
+        return "Work", "Design"
+    if any(k in joined for k in ["youtube", "netflix", "twitch"]):
+        return "Leisure", "Video"
+    if any(k in joined for k in ["chrome", "edge", "safari", "firefox"]):
+        return "Browsing", "Research"
+    return "General", "Activity"
+
 
 @dataclass
 class Settings:
@@ -26,6 +80,7 @@ class Settings:
     analysis_use_image: bool = True
     analysis_use_ocr: bool = False
     analysis_log_capture: bool = False
+    analysis_persist_raw_response: bool = False
     cleanup_tmp_frames_minutes: int = 25
     cleanup_collages_days: int = 3
     cleanup_cards_days: int = 30
@@ -55,6 +110,7 @@ def load_settings() -> Settings:
         base.analysis_use_image = bool(an.get("use_image", base.analysis_use_image))
         base.analysis_use_ocr = bool(an.get("use_ocr", base.analysis_use_ocr))
         base.analysis_log_capture = bool(an.get("log_capture", base.analysis_log_capture))
+        base.analysis_persist_raw_response = bool(an.get("persist_raw_response", base.analysis_persist_raw_response))
         cl = data.get("cleanup", {})
         base.cleanup_tmp_frames_minutes = int(cl.get("tmp_frames_minutes", base.cleanup_tmp_frames_minutes))
         base.cleanup_collages_days = int(cl.get("collages_days", base.cleanup_collages_days))
@@ -157,12 +213,76 @@ class Scheduler:
                 card = None
         if not card:
             card = summarize_card(card_info)
+        title = _normalize_title(card.get("title"))
+        summary = _normalize_summary(card.get("summary"))
+        timeline = card.get("timeline") if isinstance(card.get("timeline"), list) else None
+        if timeline and len(timeline) > 0:
+            for it in timeline:
+                if isinstance(it, dict):
+                    it["startTime"] = _to_12h(str(it.get("startTime", "")))
+                    it["endTime"] = _to_12h(str(it.get("endTime", "")))
+        else:
+            cat, sub = _infer_category(card_info.get("window_titles") or [])
+            timeline = [{
+                "startTime": "",
+                "endTime": "",
+                "category": cat,
+                "subcategory": sub,
+                "title": title,
+                "summary": summary,
+                "detailedSummary": summary,
+                "appSites": {"primary": (card_info.get("window_titles") or [""])[-1] or ""}
+            }]
+            card["source"] = card.get("source") or "heuristic"
         cards_dir = os.path.join(os.getcwd(), "data", "analysis")
         os.makedirs(cards_dir, exist_ok=True)
-        card_path = os.path.join(cards_dir, f"analysis_{int(time.time())}.json")
-        with open(card_path, "w", encoding="utf-8") as f:
-            f.write(_json.dumps({"time": ts, "card": card, "collage": out, "provider": provider_used, "model": model_used}, ensure_ascii=False))
-        print(f"[analysis] {ts} provider={provider_used} model={model_used} summary={card.get('summary','')} saved={os.path.basename(card_path)}")
+        base_ts = int(time.time())
+        primary_path = os.path.join(cards_dir, f"analysis_{base_ts}.json")
+        provider_fallback = card.get("provider_fallback") or "none"
+        obj = {
+            "time": ts,
+            "title": title,
+            "summary": summary,
+            "timeline": timeline,
+            "collage": out,
+            "provider": provider_used,
+            "model": model_used,
+            "provider_fallback": provider_fallback,
+            "source": card.get("source") or ("model" if provider_used != "local" else "heuristic")
+        }
+        with open(primary_path, "w", encoding="utf-8") as f:
+            f.write(_json.dumps(obj, ensure_ascii=False))
+        split_paths = []
+        if timeline and len(timeline) > 1:
+            for i, it in enumerate(timeline):
+                p = os.path.join(cards_dir, f"analysis_{base_ts}_{i}.json")
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(_json.dumps({
+                        "time": ts,
+                        "card": it,
+                        "collage": out,
+                        "provider": provider_used,
+                        "model": model_used,
+                        "source": obj["source"],
+                    }, ensure_ascii=False))
+                split_paths.append(p)
+            index_path = os.path.join(cards_dir, f"analysis_{base_ts}_index.json")
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write(_json.dumps({
+                    "primary": primary_path,
+                    "parts": split_paths
+                }, ensure_ascii=False))
+        raw = card.get("raw_response")
+        persist_raw = False
+        try:
+            persist_raw = bool(getattr(self.settings, "analysis_persist_raw_response", False))
+        except Exception:
+            persist_raw = False
+        if persist_raw and raw is not None:
+            raw_path = os.path.join(cards_dir, f"raw_{base_ts}.json")
+            with open(raw_path, "w", encoding="utf-8") as f:
+                f.write(_json.dumps(raw, ensure_ascii=False))
+        print(f"[analysis] {ts} provider={provider_used} model={model_used} title={title} saved={os.path.basename(primary_path)}")
 
     def _cleanup_loop(self):
         base_dir = os.path.join(os.getcwd(), "data")

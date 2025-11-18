@@ -13,18 +13,22 @@ class OpenAICompatibleProvider:
         text_parts = []
         titles = info.get("window_titles") or []
         if titles:
-            text_parts.append("窗口/页面：" + "; ".join(titles[-5:]))
+            text_parts.append("Windows/pages: " + "; ".join(titles[-5:]))
         ocr_text = (info.get("ocr_text") or "").strip()
         if ocr_text:
-            text_parts.append("文本关键词：" + ocr_text[:600])
-        prompt = "\n\n".join(text_parts) or "请根据图像与窗口标题总结最近活动。"
+            text_parts.append("OCR keywords: " + ocr_text[:600])
+        prompt = "\n\n".join(text_parts) or "Summarize recent activity based on the collage image and window titles."
         content.append({"type": "text", "text": prompt})
         if collage_b64:
             content.append({
                 "type": "image_url",
                 "image_url": {"url": "data:image/jpeg;base64," + collage_b64}
             })
-        sys_text = system_prompt.strip() if system_prompt else "你是时间线助手。任务：依据窗口标题与代表拼贴图，输出一段中文摘要（60字内），并列出2-3个可能的分心来源（应用或网站）。"
+        sys_text = system_prompt.strip() if system_prompt else (
+            "You are an objective activity synthesizer. Produce concise, English-only outputs. "
+            "Return a title (5–10 words) and a factual summary (≤2 sentences). Optionally return a timeline array with per-card entries "
+            "containing startTime, endTime, category, subcategory, title, summary, detailedSummary, appSites. No distraction lists or subjective judgments."
+        )
         payload = {
             "model": self.model,
             "messages": [
@@ -40,13 +44,17 @@ class OpenAICompatibleProvider:
             "Content-Type": "application/json"
         }
         url = self.base_url + "/chat/completions"
-        # 尝试主样式
+        fallback_used = "none"
+        raw_data = None
+        # primary style
         try:
             r = requests.post(url, json=payload, headers=headers, timeout=30)
             r.raise_for_status()
             data = r.json()
+            raw_data = data
         except Exception:
-            # 回退：仅文本
+            # fallback: text-only
+            fallback_used = "text_only"
             payload_fallback = {
                 "model": self.model,
                 "messages": [
@@ -61,8 +69,10 @@ class OpenAICompatibleProvider:
                 r = requests.post(url, json=payload_fallback, headers=headers, timeout=30)
                 r.raise_for_status()
                 data = r.json()
+                raw_data = data
             except Exception:
-                # 回退2：某些实现使用 images 字段
+                # fallback 2: some implementations use images sidecar
+                fallback_used = "images_sidecar" if collage_b64 else fallback_used
                 if collage_b64:
                     payload_images = {
                         "model": self.model,
@@ -77,6 +87,7 @@ class OpenAICompatibleProvider:
                     r = requests.post(url, json=payload_images, headers=headers, timeout=30)
                     r.raise_for_status()
                     data = r.json()
+                    raw_data = data
                 else:
                     data = {"choices": [{"message": {"content": ""}}]}
         msg = (data.get("choices") or [{}])[0].get("message", {})
@@ -86,7 +97,7 @@ class OpenAICompatibleProvider:
             txt = " ".join([t for t in parts if t])
         else:
             txt = msg.get("content") or ""
-        # 尝试解析为 JSON 数组（若提示要求返回结构化结果）
+        # try parsing as JSON array
         import json as _json
         parsed = None
         try:
@@ -98,7 +109,24 @@ class OpenAICompatibleProvider:
             parsed = None
         if isinstance(parsed, list) and parsed:
             first = parsed[0]
-            title = first.get("title") or "最近活动摘要"
-            summary = first.get("summary") or txt or "无模型返回"
-            return {"title": title, "summary": summary, "apps": [], "domains": [], "timeline": parsed}
-        return {"title": "最近活动摘要", "summary": txt or "无模型返回", "apps": [], "domains": []}
+            title = first.get("title") or "Recent Activity"
+            summary = first.get("summary") or txt or "No model output"
+            return {
+                "title": title,
+                "summary": summary,
+                "apps": [],
+                "domains": [],
+                "timeline": parsed,
+                "provider_fallback": fallback_used,
+                "raw_response": raw_data,
+                "source": "model",
+            }
+        return {
+            "title": "Recent Activity",
+            "summary": txt or "No model output",
+            "apps": [],
+            "domains": [],
+            "provider_fallback": fallback_used,
+            "raw_response": raw_data,
+            "source": "model",
+        }
