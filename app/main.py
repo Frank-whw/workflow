@@ -109,46 +109,49 @@ class Scheduler:
         while not self._stop.is_set():
             time.sleep(interval)
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
-            frames = list_recent_frames(os.path.join(os.getcwd(), "data", "tmp_frames"), 120)
-            picked = sample_even(frames, 12)
-            collage_dir = os.path.join(os.getcwd(), "data", "tmp_collages")
-            collage_path = os.path.join(collage_dir, f"collage_{int(time.time())}.jpg")
-            out = make_collage(picked, (3, 4), collage_path)
-            text = extract_text(picked) if self.settings.analysis_use_ocr else ""
-            card_info = {
-                "window_titles": [t for ts2, t in self._title_buffer if time.time() - ts2 <= self.settings.analysis_interval_minutes * 60][-10:],
-                "ocr_text": text,
-                "apps": [],
-                "domains": [],
-            }
-            card = None
-            provider_used = "local"
-            model_used = ""
-            collage_b64 = ""
-            if self.settings.analysis_use_image and out and os.path.exists(out):
-                with open(out, "rb") as f:
-                    collage_b64 = base64.b64encode(f.read()).decode("ascii")
-            if self.settings.model_type == "openai_compatible" and self.settings.model_base_url:
-                try:
-                    from app.provider import OpenAICompatibleProvider
-                    prov = OpenAICompatibleProvider(
-                        base_url=self.settings.model_base_url,
-                        api_key=self.settings.model_api_key,
-                        model=self.settings.model_name or "gpt-4o-mini"
-                    )
-                    card = prov.summarize(card_info, collage_b64 if self.settings.analysis_use_image else "")
-                    provider_used = "openai_compatible"
-                    model_used = prov.model
-                except Exception:
-                    card = None
-            if not card:
-                card = summarize_card(card_info)
-            cards_dir = os.path.join(os.getcwd(), "data", "cards")
-            os.makedirs(cards_dir, exist_ok=True)
-            card_path = os.path.join(cards_dir, f"card_{int(time.time())}.json")
-            with open(card_path, "w", encoding="utf-8") as f:
-                f.write(_json.dumps({"time": ts, "card": card, "collage": out, "provider": provider_used, "model": model_used}, ensure_ascii=False))
-            print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)} card_saved=True provider={provider_used}")
+            self._do_analysis(ts)
+
+    def _do_analysis(self, ts: str):
+        frames = list_recent_frames(os.path.join(os.getcwd(), "data", "tmp_frames"), 120)
+        picked = sample_even(frames, 12)
+        collage_dir = os.path.join(os.getcwd(), "data", "tmp_collages")
+        collage_path = os.path.join(collage_dir, f"collage_{int(time.time())}.jpg")
+        out = make_collage(picked, (3, 4), collage_path)
+        text = extract_text(picked) if self.settings.analysis_use_ocr else ""
+        card_info = {
+            "window_titles": [t for ts2, t in self._title_buffer if time.time() - ts2 <= self.settings.analysis_interval_minutes * 60][-10:],
+            "ocr_text": text,
+            "apps": [],
+            "domains": [],
+        }
+        card = None
+        provider_used = "local"
+        model_used = ""
+        collage_b64 = ""
+        if self.settings.analysis_use_image and out and os.path.exists(out):
+            with open(out, "rb") as f:
+                collage_b64 = base64.b64encode(f.read()).decode("ascii")
+        if self.settings.model_type == "openai_compatible" and self.settings.model_base_url:
+            try:
+                from app.provider import OpenAICompatibleProvider
+                prov = OpenAICompatibleProvider(
+                    base_url=self.settings.model_base_url,
+                    api_key=self.settings.model_api_key,
+                    model=self.settings.model_name or "gpt-4o-mini"
+                )
+                card = prov.summarize(card_info, collage_b64 if self.settings.analysis_use_image else "")
+                provider_used = "openai_compatible"
+                model_used = prov.model
+            except Exception:
+                card = None
+        if not card:
+            card = summarize_card(card_info)
+        cards_dir = os.path.join(os.getcwd(), "data", "cards")
+        os.makedirs(cards_dir, exist_ok=True)
+        card_path = os.path.join(cards_dir, f"card_{int(time.time())}.json")
+        with open(card_path, "w", encoding="utf-8") as f:
+            f.write(_json.dumps({"time": ts, "card": card, "collage": out, "provider": provider_used, "model": model_used}, ensure_ascii=False))
+        print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)} card_saved=True provider={provider_used}")
 
     def _cleanup_loop(self):
         base_dir = os.path.join(os.getcwd(), "data")
@@ -169,9 +172,12 @@ def main():
     scheduler.start()
     try:
         run_seconds = os.environ.get("RUN_SECONDS")
-        if os.environ.get("RUN_ANALYSIS_ON_START"):
-            time.sleep(0.5)
-            scheduler._analysis_loop()
+        if os.environ.get("RUN_SINGLE_ANALYSIS_AFTER_SECONDS"):
+            wait_s = int(os.environ.get("RUN_SINGLE_ANALYSIS_AFTER_SECONDS"))
+            end = time.time() + max(1, wait_s)
+            while time.time() < end:
+                time.sleep(0.5)
+            scheduler._do_analysis(time.strftime("%Y-%m-%d %H:%M:%S"))
         if run_seconds:
             end = time.time() + max(1, int(run_seconds))
             while time.time() < end:
