@@ -1,6 +1,9 @@
 !include "MUI2.nsh"
 
+!ifdef PROJ_ROOT
+!else
 !define PROJ_ROOT "${__FILEDIR__}\\.."
+!endif
 
 Name "Workflow"
 OutFile "${PROJ_ROOT}\\dist\\workflow-setup.exe"

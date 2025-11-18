@@ -27,7 +27,7 @@ jobs:
         run: |
           $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
           if (!(Test-Path $nsis)) { $nsis = "${env:ProgramFiles}\NSIS\makensis.exe" }
-          & $nsis installer\workflow.nsi
+          & $nsis /DPROJ_ROOT="${pwd}" installer\workflow.nsi
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
