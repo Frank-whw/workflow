@@ -25,6 +25,7 @@ class Settings:
     model_name: str = ""
     analysis_use_image: bool = True
     analysis_use_ocr: bool = False
+    analysis_log_capture: bool = False
     cleanup_tmp_frames_minutes: int = 25
     cleanup_collages_days: int = 3
     cleanup_cards_days: int = 30
@@ -53,6 +54,7 @@ def load_settings() -> Settings:
         an = data.get("analysis", {})
         base.analysis_use_image = bool(an.get("use_image", base.analysis_use_image))
         base.analysis_use_ocr = bool(an.get("use_ocr", base.analysis_use_ocr))
+        base.analysis_log_capture = bool(an.get("log_capture", base.analysis_log_capture))
         cl = data.get("cleanup", {})
         base.cleanup_tmp_frames_minutes = int(cl.get("tmp_frames_minutes", base.cleanup_tmp_frames_minutes))
         base.cleanup_collages_days = int(cl.get("collages_days", base.cleanup_collages_days))
@@ -98,8 +100,9 @@ class Scheduler:
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             path = self._cap.capture_to_file()
             title, pid = self._tracker.get_foreground_activity()
-            info = f"title={title or ''} pid={pid or ''}"
-            print(f"[capture] {ts} saved={bool(path)} {info}")
+            if self.settings.analysis_log_capture:
+                info = f"title={title or ''} pid={pid or ''}"
+                print(f"[capture] {ts} saved={bool(path)} {info}")
             if title:
                 self._title_buffer.append((time.time(), title))
             time.sleep(interval)
@@ -146,12 +149,12 @@ class Scheduler:
                 card = None
         if not card:
             card = summarize_card(card_info)
-        cards_dir = os.path.join(os.getcwd(), "data", "cards")
+        cards_dir = os.path.join(os.getcwd(), "data", "analysis")
         os.makedirs(cards_dir, exist_ok=True)
-        card_path = os.path.join(cards_dir, f"card_{int(time.time())}.json")
+        card_path = os.path.join(cards_dir, f"analysis_{int(time.time())}.json")
         with open(card_path, "w", encoding="utf-8") as f:
             f.write(_json.dumps({"time": ts, "card": card, "collage": out, "provider": provider_used, "model": model_used}, ensure_ascii=False))
-        print(f"[analysis] {ts} frames={len(frames)} picked={len(picked)} collage={bool(out)} card_saved=True provider={provider_used}")
+        print(f"[analysis] {ts} provider={provider_used} model={model_used} summary={card.get('summary','')} saved={os.path.basename(card_path)}")
 
     def _cleanup_loop(self):
         base_dir = os.path.join(os.getcwd(), "data")

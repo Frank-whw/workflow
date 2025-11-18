@@ -48,12 +48,14 @@ class CleanupService:
             frames_dir = os.path.join(self.base_dir, "tmp_frames")
             collages_dir = os.path.join(self.base_dir, "tmp_collages")
             cards_dir = os.path.join(self.base_dir, "cards")
+            analysis_dir = os.path.join(self.base_dir, "analysis")
             c1 = _remove_older_than(frames_dir, self.tmp_minutes * 60)
             c2 = _remove_older_than(collages_dir, self.collages_days * 86400)
             c3 = _remove_older_than(cards_dir, self.cards_days * 86400) if self.cards_days > 0 else 0
+            c4 = _remove_older_than(analysis_dir, self.cards_days * 86400) if self.cards_days > 0 else 0
             total_mb = _dir_size_mb(self.base_dir)
             if total_mb > self.max_mb:
                 _remove_older_than(frames_dir, 0)
                 _remove_older_than(collages_dir, 0)
-            print(f"[cleanup] frames={c1} collages={c2} cards={c3} total_mb={total_mb}")
+            print(f"[cleanup] frames={c1} collages={c2} cards={c3} analysis={c4} total_mb={total_mb}")
             time.sleep(600)

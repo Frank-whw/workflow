@@ -9,7 +9,8 @@
   },
   "analysis": {
     "use_image": true,
-    "use_ocr": false
+    "use_ocr": false,
+    "log_capture": false
   },
   "cleanup": {
     "tmp_frames_minutes": 25,
